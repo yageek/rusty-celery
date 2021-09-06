@@ -352,7 +352,7 @@ where
         let task_trace_builders = self.task_trace_builders.read().await;
         if let Some(build_tracer) = task_trace_builders.get(&message.headers.task) {
             Ok(build_tracer(
-                self,
+                Box::new(Arc::new(self)),
                 message,
                 self.task_options,
                 event_tx,

@@ -112,7 +112,10 @@ where
         }
     }
 
-    fn from_message(dispatcher: Box<dyn Dispatcher>, m: Message) -> Result<Self, ProtocolError> {
+    pub(crate) fn from_message(
+        dispatcher: Box<dyn Dispatcher>,
+        m: Message,
+    ) -> Result<Self, ProtocolError> {
         let body = m.body::<T>()?;
         let (task_params, _) = body.parts();
         Ok(Self::new(dispatcher, m, task_params))
