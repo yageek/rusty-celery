@@ -1,4 +1,5 @@
 use super::Task;
+use crate::app::Dispatcher;
 use crate::error::ProtocolError;
 use crate::protocol::Message;
 use chrono::{DateTime, Utc};
@@ -7,7 +8,6 @@ use std::time::SystemTime;
 use tokio::time::Duration;
 
 /// A [`Request`] contains information and state related to the currently executing task.
-#[derive(Clone)]
 pub struct Request<T>
 where
     T: Task,
@@ -47,13 +47,16 @@ where
 
     /// The time limit (in seconds) allocated for this task to execute.
     pub time_limit: Option<u32>,
+
+    /// A reference to the dispatcher that created this request
+    dispatcher: Box<dyn Dispatcher>,
 }
 
 impl<T> Request<T>
 where
     T: Task,
 {
-    pub fn new(m: Message, p: T::Params) -> Self {
+    pub fn new(dispatcher: Box<dyn Dispatcher>, m: Message, p: T::Params) -> Self {
         let time_limit = match m.headers.timelimit {
             (Some(soft_timelimit), Some(hard_timelimit)) => {
                 Some(std::cmp::min(soft_timelimit, hard_timelimit))
@@ -75,6 +78,7 @@ where
             hostname: None,
             reply_to: m.properties.reply_to,
             time_limit,
+            dispatcher,
         }
     }
 
@@ -107,17 +111,10 @@ where
             false
         }
     }
-}
 
-impl<T> TryFrom<Message> for Request<T>
-where
-    T: Task,
-{
-    type Error = ProtocolError;
-
-    fn try_from(m: Message) -> Result<Self, Self::Error> {
+    fn from_message(dispatcher: Box<dyn Dispatcher>, m: Message) -> Result<Self, ProtocolError> {
         let body = m.body::<T>()?;
         let (task_params, _) = body.parts();
-        Ok(Self::new(m, task_params))
+        Ok(Self::new(dispatcher, m, task_params))
     }
 }

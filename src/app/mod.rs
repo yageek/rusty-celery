@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use colored::Colorize;
 use futures::stream::StreamExt;
 use log::{debug, error, info, warn};
@@ -6,7 +7,6 @@ use std::convert::TryFrom;
 use std::error::Error;
 use std::sync::Arc;
 use tokio::select;
-
 #[cfg(unix)]
 use tokio::signal::unix::{signal, Signal, SignalKind};
 
@@ -329,8 +329,7 @@ where
             message.task_id(),
             queue,
         );
-        self.broker.send(&message, queue).await?;
-        Ok(AsyncResult::new(message.task_id()))
+        self.send_message(&message, &queue).await
     }
 
     /// Register a task.
@@ -352,10 +351,14 @@ where
     ) -> Result<Box<dyn TracerTrait>, Box<dyn Error + Send + Sync + 'static>> {
         let task_trace_builders = self.task_trace_builders.read().await;
         if let Some(build_tracer) = task_trace_builders.get(&message.headers.task) {
-            Ok(
-                build_tracer(message, self.task_options, event_tx, self.hostname.clone())
-                    .map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync + 'static>)?,
+            Ok(build_tracer(
+                self,
+                message,
+                self.task_options,
+                event_tx,
+                self.hostname.clone(),
             )
+            .map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync + 'static>)?)
         } else {
             Err(
                 Box::new(CeleryError::UnregisteredTaskError(message.headers.task))
@@ -665,6 +668,29 @@ where
         info!("No more pending tasks. See ya!");
 
         Ok(())
+    }
+}
+
+#[async_trait]
+/// A trait abstracting the capaibility to dispatch
+/// a new task.
+pub(crate) trait Dispatcher: Send + Sync {
+    async fn send_message(
+        &self,
+        message: &Message,
+        queue: &str,
+    ) -> Result<AsyncResult, CeleryError>;
+}
+
+#[async_trait]
+impl<'a, B: 'static + Broker> Dispatcher for Celery<B> {
+    async fn send_message(
+        &self,
+        message: &Message,
+        queue: &str,
+    ) -> Result<AsyncResult, CeleryError> {
+        self.broker.send(&message, queue).await?;
+        Ok(AsyncResult::new(message.task_id()))
     }
 }
 

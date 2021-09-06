@@ -1,12 +1,13 @@
 use async_trait::async_trait;
 use log::{debug, error, info, warn};
-use std::convert::TryFrom;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::time::{self, Duration, Instant};
 
 use crate::error::{ProtocolError, TaskError, TraceError};
 use crate::protocol::Message;
 use crate::task::{Request, Task, TaskEvent, TaskOptions, TaskStatus};
+
+use super::Dispatcher;
 
 /// A `Tracer` provides the API through which a `Celery` application interacts with its tasks.
 ///
@@ -222,20 +223,27 @@ pub(super) trait TracerTrait: Send + Sync {
 pub(super) type TraceBuilderResult = Result<Box<dyn TracerTrait>, ProtocolError>;
 
 pub(super) type TraceBuilder = Box<
-    dyn Fn(Message, TaskOptions, UnboundedSender<TaskEvent>, String) -> TraceBuilderResult
+    dyn Fn(
+            Box<dyn Dispatcher>,
+            Message,
+            TaskOptions,
+            UnboundedSender<TaskEvent>,
+            String,
+        ) -> TraceBuilderResult
         + Send
         + Sync
         + 'static,
 >;
 
 pub(super) fn build_tracer<T: Task + Send + 'static>(
+    dispatcher: Box<dyn Dispatcher>,
     message: Message,
     mut options: TaskOptions,
     event_tx: UnboundedSender<TaskEvent>,
     hostname: String,
 ) -> TraceBuilderResult {
     // Build request object.
-    let mut request = Request::<T>::try_from(message)?;
+    let mut request = Request::<T>::from_message(dispatcher, message)?;
     request.hostname = Some(hostname);
 
     // Override app-level options with task-level options.
