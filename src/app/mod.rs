@@ -351,8 +351,9 @@ where
     ) -> Result<Box<dyn TracerTrait>, Box<dyn Error + Send + Sync + 'static>> {
         let task_trace_builders = self.task_trace_builders.read().await;
         if let Some(build_tracer) = task_trace_builders.get(&message.headers.task) {
+            let element = Box::pin(self);
             Ok(build_tracer(
-                Box::new(Arc::new(self)),
+                element,
                 message,
                 self.task_options,
                 event_tx,

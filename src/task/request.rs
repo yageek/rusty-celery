@@ -4,6 +4,7 @@ use crate::error::ProtocolError;
 use crate::protocol::Message;
 use chrono::{DateTime, Utc};
 use std::convert::TryFrom;
+use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::time::Duration;
 
@@ -49,7 +50,7 @@ where
     pub time_limit: Option<u32>,
 
     /// A reference to the dispatcher that created this request
-    dispatcher: Box<dyn Dispatcher>,
+    dispatcher: Arc<Box<dyn Dispatcher>>,
 }
 
 impl<T> Request<T>

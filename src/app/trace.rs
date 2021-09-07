@@ -1,3 +1,6 @@
+use std::pin::Pin;
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use log::{debug, error, info, warn};
 use tokio::sync::mpsc::UnboundedSender;
@@ -224,7 +227,7 @@ pub(super) type TraceBuilderResult = Result<Box<dyn TracerTrait>, ProtocolError>
 
 pub(super) type TraceBuilder = Box<
     dyn Fn(
-            Box<dyn Dispatcher>,
+            Pin<Box<dyn Dispatcher>>,
             Message,
             TaskOptions,
             UnboundedSender<TaskEvent>,
